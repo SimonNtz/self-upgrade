@@ -40,7 +40,10 @@ func main() {
 		}
 	})
 	http.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Not implemented %v", html.EscapeString(r.URL.Path))
+		Status.NewVersion = "ver2"
+		if err := page.Execute(w, Status); err != nil {
+			log.Fatal(err)
+		}
 	})
 	http.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Not implemented %v", html.EscapeString(r.URL.Path))
