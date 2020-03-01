@@ -10,9 +10,10 @@ import (
 	"strings"
 )
 
-const Version = "ver1"
+// const Version = "ver1"
 
 var (
+	Version      string // Defined by build flag with ```go build -ldflags="-X 'main.Version=vX'"````
 	pageTemplate = `
 <!DOCTYPE html>
 <html>
