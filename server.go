@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -55,13 +56,24 @@ func main() {
 	})
 	http.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
 		DownloadFile(NewVersionName)
+		osExec(NewVersionName)
 		fmt.Fprintf(w, "Installing update: %s", NewVersionName)
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
+func osExec(execName string) {
+	cmd := exec.Command(execName)
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("Run of the executable %s failed with %s\n", execName, err)
+	}
+}
+
 // Download file from local storage dir 'Dist'
 // Should be passed an interface io.Reader for testing
+// No error returned on Donwload
 func DownloadFile(filename string) {
 
 	// Open the file that should be copied
@@ -75,8 +87,8 @@ func DownloadFile(filename string) {
 		log.Fatal(err)
 	}
 	defer from.Close()
-
-	to, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0666)
+	// A FileMode represents a file's mode and permission bits. 770 - Owner and Group have all, and Other can read and execute
+	to, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0770)
 	if err != nil {
 		log.Fatal(err)
 	}
