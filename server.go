@@ -11,19 +11,18 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 )
 
 type specifiHandler struct {
-	addr     string
-	ln       net.Listener
-	server   *http.Server
 	page     *template.Template
 	signalCh chan os.Signal
 }
 
-const Version = "ver1"
+const Version = "ver24"
 const UpdateDir = "./dist/"
 
 var (
@@ -63,32 +62,19 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
+	// DownloadFile(NewVersionName)
+	fmt.Printf("Exec downloaded.\n")
 	defer http.Redirect(w, r, "/", 302)
-	fmt.Printf("reload signal received for exec %s.\n", NewVersionName)
+	sh.signalCh <- syscall.SIGINT
 
 	// DownloadFile(NewVersionName)
 	// fmt.Printf("Exec downloaded.\n")
 
-	p, err := UpdateExec(sh.addr, sh.ln, NewVersionName)
-	if err != nil {
-		fmt.Printf("Unable to start new executable: %v.\n", err)
-	}
-	fmt.Printf("New executable started pid:  %v.\n", p.Pid)
-	// Create a context that will expire in 5 seconds and use this as a
-	// timeout to Shutdown.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	// Return any errors during shutdown.
-	err = sh.server.Shutdown(ctx)
-	if err != nil {
-		fmt.Fprintf(w, "Reload failed")
-	}
-	time.Sleep(100 * time.Millisecond)
 }
 
 func startServer(addr string, ln net.Listener) *http.Server {
 
-	sh := specifiHandler{addr, ln, nil, nil}
+	sh := specifiHandler{nil, nil}
 
 	http.HandleFunc("/", sh.handler)
 	http.HandleFunc("/check", sh.handlerCheck)
@@ -103,13 +89,30 @@ func startServer(addr string, ln net.Listener) *http.Server {
 		log.Fatal(err)
 	}
 
-	sh.server = httpServer
-	sh.page = page
+	signalCh := make(chan os.Signal, 1024)
 
 	go httpServer.Serve(ln)
 
-	<-sh.signalCh
+	sh.page = page
+	sh.signalCh = signalCh
+	signal.Notify(signalCh, syscall.SIGHUP)
 
+	<-signalCh
+
+	p, err := UpdateExec(addr, ln, NewVersionName)
+	if err != nil {
+		fmt.Printf("Error while installing update: %s: %v.\n", NewVersionName, err)
+	}
+	fmt.Printf("Update: %s installed sucessfully - pid:  %v.\n", NewVersionName, p.Pid)
+	// Create a context that will expire in 5 seconds and use this as a
+	// timeout to Shutdown.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Return any errors during shutdown.
+	err = httpServer.Shutdown(ctx)
+	if err != nil {
+		fmt.Printf("Error while shutting down server %v", err)
+	}
 	return httpServer
 }
 
@@ -168,7 +171,6 @@ func listDir() (filesName []string) {
 
 func main() {
 	// Parse command line flags for the address to listen on.
-	fmt.Printf(string(os.Getpid()) + "\n")
 	var addr string
 	flag.StringVar(&addr, "addr", ":9000", "Address to listen on.")
 	// Create (or import) a net.Listener and start a goroutine that runs
