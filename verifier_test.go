@@ -22,7 +22,7 @@ func TestSignAndVerifiy(t *testing.T) {
 
 func TestDownloadFile(t *testing.T) {
 	fmt.Println(checkNewVersion())
-	DownloadErr := DownloadAndVerifyFile(filepath.Join("dist", "self-upgrade.ver24"))
+	DownloadErr := downloadAndVerifyFile(filepath.Join("dist", "self-upgrade.ver24"))
 	if DownloadErr != nil {
 		t.Errorf("Download failed failed: %s", DownloadErr)
 	}

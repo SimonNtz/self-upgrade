@@ -85,7 +85,8 @@ func getListenerFile(ln net.Listener) (*os.File, error) {
 	return nil, fmt.Errorf("unsupported listener: %T", ln)
 }
 
-// RestartExec tries to start an new executable while passing the current TCP listener to have zero downtime
+// RestartExec an new executable while preserving the current TCP listener
+// in order to have zero downtime on restart
 func RestartExec(addr string, ln net.Listener) (*os.Process, error) {
 	// Get the file descriptor for the listener and marshal the metadata to pass
 	// to the child in the environment.

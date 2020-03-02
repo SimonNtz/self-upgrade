@@ -55,6 +55,7 @@ func (sh *specifiHandler) handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handlerCheck checks if a new version exists in local storage directory
 func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 
 	if newVersion := checkNewVersion(); newVersion != "" {
@@ -65,25 +66,32 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handlerInstall installs new version of current executable from local storage
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
-	if NewVersionName == "" {
+
+	// This condition protects our handler against attack by URL manipulation
+	if checkNewVersion() == "" {
 		http.Error(w, `Unauthorized access`, http.StatusUnauthorized)
 		return
 	}
 
-	err := DownloadAndVerifyFile(filepath.Join(UpdateDir, NewVersionName))
+	// Download and signature verificaiton of new executable starts here
+	err := downloadAndVerifyFile(filepath.Join(UpdateDir, NewVersionName))
 	if err != nil {
 		errString := fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err)
-		log.Fatalf(errString)
+		log.Fatalf(fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err))
 		http.Error(w, errString, http.StatusInternalServerError)
 		return
 	}
 
+	// Redirects client's browser to home page before server shutdown
 	defer http.Redirect(w, r, "/", 302)
 	sh.signalCh <- syscall.SIGINT
 
 }
 
+// Start server and wait for the SIGINT signal to restart
+//  with the updated version while preserging the TCP socket
 func startServer(addr string, ln net.Listener) *http.Server {
 
 	sh := specifiHandler{nil, nil}
@@ -111,6 +119,7 @@ func startServer(addr string, ln net.Listener) *http.Server {
 
 	<-signalCh
 
+	// Restart the with updated executable while preserving the socket info
 	p, err := RestartExec(addr, ln)
 	if err != nil {
 		fmt.Printf("Error while installing update: %s: %v.\n", NewVersionName, err)
@@ -128,16 +137,10 @@ func startServer(addr string, ln net.Listener) *http.Server {
 	return httpServer
 }
 
-// Download file from local storage dir 'Dist'
-// Should be passed an interface io.Reader for testing
-// No error returned on Donwload
-func DownloadAndVerifyFile(filePath string) error {
+// Download and verifiy the new executable file
+// from local storage dir "Dist"
+func downloadAndVerifyFile(filePath string) error {
 
-	// Open the file that should be copied
-	// Read the contents
-	// Create and open the file that the contents should be copied into
-	// Write to the new file
-	// Close both files
 	from, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -149,20 +152,23 @@ func DownloadAndVerifyFile(filePath string) error {
 		return err
 	}
 
+	// Verifiy file's RSA signature before removing current executable
 	err = VerifyRSASignature(filePath, filePath+SignatureExtension)
 	if err != nil {
 		return err
 	}
 	fmt.Println("Executable verified and Downloaded")
 
+	// Remove current executable file
 	os.Remove(execName)
-	// A FileMode represents a file's mode and permission bits. 770 - Owner and Group have all, and Other can read and execute
+
 	to, err := os.OpenFile(execName, os.O_RDWR|os.O_CREATE, 0770)
 	if err != nil {
 		return err
 	}
 	defer to.Close()
 
+	// Replace current executable
 	_, err = io.Copy(to, from)
 	if err != nil {
 		return err
@@ -171,12 +177,8 @@ func DownloadAndVerifyFile(filePath string) error {
 	return nil
 }
 
-// TODO: pass as an argument HARDCODED DIR '/DIST' PATH
-// Check dir exists
-// Assumption take first update sorted by date
-
 // Make purposely no distinction between eventual
-// local storage read errors and no file found
+// local storage read error and no file found
 func checkNewVersion() string {
 	for _, f := range listDir() {
 		if fn := strings.Split(f, "."); len(fn) == 2 {
@@ -213,8 +215,8 @@ func main() {
 		fmt.Printf("Unable to create or import a listener: %v.\n", err)
 		os.Exit(1)
 	}
+
 	startServer(addr, ln)
 
-	// Wait for signals to either fork or quit.
 	fmt.Printf("Exiting.\n")
 }

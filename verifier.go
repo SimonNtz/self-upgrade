@@ -31,6 +31,7 @@ NQH1lYi0AL6qBHZmU6BJMBFe7JU/9ctanTW+3X/a345XalZd1u0Z9R0CAwEAAQ==
 -----END RSA PUBLIC KEY-----
 `
 
+// ParseRsaPrivateKeyFromPemStr allows to deserialize a RSA private key from a string
 func ParseRsaPrivateKeyFromPemStr(privPEM string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(privPEM))
 	if block == nil {
@@ -45,6 +46,7 @@ func ParseRsaPrivateKeyFromPemStr(privPEM string) (*rsa.PrivateKey, error) {
 	return priv, nil
 }
 
+// ParseRsaPublicKeyFromPemStr allows to deserialize a RSA public key from a string
 func ParseRsaPublicKeyFromPemStr(pubPEM string) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode([]byte(pubPEM))
 	if block == nil {
@@ -65,6 +67,7 @@ func ParseRsaPublicKeyFromPemStr(pubPEM string) (*rsa.PublicKey, error) {
 	return nil, errors.New("Key type is not RSA")
 }
 
+// VerifyRSASignature allows to verfiy files RSA signature
 func VerifyRSASignature(targetFilename, signatureFilename string) (err error) {
 	pubKey, err := ParseRsaPublicKeyFromPemStr(rsaPublicKey)
 	if err != nil {
@@ -88,6 +91,7 @@ func VerifyRSASignature(targetFilename, signatureFilename string) (err error) {
 	return nil
 }
 
+// SignRSA allows to sign files with RSA
 func SignRSA(targetFilename, outFilename string) (err error) {
 	privKey, err := ParseRsaPrivateKeyFromPemStr(rsaPrivateKey)
 	if err != nil {
@@ -112,7 +116,8 @@ func SignRSA(targetFilename, outFilename string) (err error) {
 	return nil
 }
 
-func generateKeyPair(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+// GenerateKeyPair can be used for testing or exporting keys to file
+func GenerateKeyPair(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	privkey, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
 		return nil, nil, err
