@@ -53,7 +53,7 @@ func (sh *specifiHandler) handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
-	if newVersion := CheckNewVersion(); newVersion != "" {
+	if newVersion := checkNewVersion(); newVersion != "" {
 		Status.NewVersion = newVersion
 	}
 	if err := sh.page.Execute(w, Status); err != nil {
@@ -71,6 +71,7 @@ func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request)
 		errString := fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err)
 		log.Fatalf(errString)
 		http.Error(w, errString, http.StatusInternalServerError)
+		return
 	}
 
 	fmt.Printf("Exec downloaded.\n")
@@ -109,7 +110,7 @@ func startServer(addr string, ln net.Listener) *http.Server {
 
 	<-signalCh
 
-	p, err := UpdateExec(addr, ln, NewVersionName)
+	p, err := RestartExec(addr, ln)
 	if err != nil {
 		fmt.Printf("Error while installing update: %s: %v.\n", NewVersionName, err)
 	}
@@ -142,8 +143,14 @@ func DownloadFile(filename string) error {
 		return err
 	}
 	defer from.Close()
+
+	execName, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	os.Remove(execName)
 	// A FileMode represents a file's mode and permission bits. 770 - Owner and Group have all, and Other can read and execute
-	to, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0770)
+	to, err := os.OpenFile(execName, os.O_RDWR|os.O_CREATE, 0770)
 	if err != nil {
 		return err
 	}
@@ -161,7 +168,9 @@ func DownloadFile(filename string) error {
 // Check dir exists
 // Assumption take first update sorted by date
 
-func CheckNewVersion() string {
+// Make purposely no distinction between eventual
+// local storage read errors and no file found
+func checkNewVersion() string {
 	if filesName := listDir(); filesName != nil {
 		NewVersionName = filesName[0]
 		return strings.Split(filesName[0], ".")[1]
@@ -169,10 +178,13 @@ func CheckNewVersion() string {
 	return ""
 }
 
+// Keep the eventual error inside the scope to not
+// and unveil possible local storage error to http client
 func listDir() (filesName []string) {
 	files, err := ioutil.ReadDir(UpdateDir)
 	if err != nil {
 		log.Fatal(err)
+		return
 	}
 
 	for _, f := range files {
