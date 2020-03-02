@@ -30,9 +30,7 @@ const (
 )
 
 var (
-	// Version        string // Defined by build flag with ```go build -ldflags="-X 'main.Version=vX'"````
-	newVersionName string
-	pageTemplate   = `
+	pageTemplate = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -47,7 +45,8 @@ href="install">Upgrade</a>{{end}}
 </body>
 </html>
 `
-	Status = struct{ Version, NewVersion string }{Version, ""}
+	Status         = struct{ Version, NewVersion string }{Version, ""}
+	NewVersionName string
 )
 
 func (sh *specifiHandler) handler(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +56,7 @@ func (sh *specifiHandler) handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
+
 	if newVersion := checkNewVersion(); newVersion != "" {
 		Status.NewVersion = newVersion
 	}
@@ -66,14 +66,14 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
-	if newVersionName == "" {
+	if NewVersionName == "" {
 		http.Error(w, `Unauthorized access`, http.StatusUnauthorized)
 		return
 	}
 
-	err := DownloadAndVerifyFile(filepath.Join(UpdateDir, newVersionName))
+	err := DownloadAndVerifyFile(filepath.Join(UpdateDir, NewVersionName))
 	if err != nil {
-		errString := fmt.Sprintf("Error while donwloading %s: %v", newVersionName, err)
+		errString := fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err)
 		log.Fatalf(errString)
 		http.Error(w, errString, http.StatusInternalServerError)
 		return
@@ -113,9 +113,9 @@ func startServer(addr string, ln net.Listener) *http.Server {
 
 	p, err := RestartExec(addr, ln)
 	if err != nil {
-		fmt.Printf("Error while installing update: %s: %v.\n", newVersionName, err)
+		fmt.Printf("Error while installing update: %s: %v.\n", NewVersionName, err)
 	}
-	fmt.Printf("Update: %s installed sucessfully - pid:  %v.\n", newVersionName, p.Pid)
+	fmt.Printf("Update: %s installed sucessfully - pid:  %v.\n", NewVersionName, p.Pid)
 	// Create a context that will expire in 5 seconds and use this as a
 	// timeout to Shutdown.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -138,7 +138,6 @@ func DownloadAndVerifyFile(filePath string) error {
 	// Create and open the file that the contents should be copied into
 	// Write to the new file
 	// Close both files
-	fmt.Println(filePath)
 	from, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -181,7 +180,7 @@ func DownloadAndVerifyFile(filePath string) error {
 func checkNewVersion() string {
 	for _, f := range listDir() {
 		if fn := strings.Split(f, "."); len(fn) == 2 {
-			newVersionName = f
+			NewVersionName = f
 			return fn[1]
 		}
 	}
