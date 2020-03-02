@@ -22,7 +22,7 @@ type specifiHandler struct {
 	signalCh chan os.Signal
 }
 
-const Version = "ver24"
+const Version = "ver1"
 const UpdateDir = "./dist/"
 
 var (
@@ -62,7 +62,7 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
-	// DownloadFile(NewVersionName)
+	DownloadFile(NewVersionName)
 	fmt.Printf("Exec downloaded.\n")
 	defer http.Redirect(w, r, "/", 302)
 	sh.signalCh <- syscall.SIGINT
