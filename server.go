@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -22,12 +23,15 @@ type specifiHandler struct {
 	signalCh chan os.Signal
 }
 
-const Version = "ver1"
-const UpdateDir = "./dist/"
+const (
+	Version            = "ver1"
+	UpdateDir          = "dist"
+	SignatureExtension = ".RSAsignature"
+)
 
 var (
 	// Version        string // Defined by build flag with ```go build -ldflags="-X 'main.Version=vX'"````
-	NewVersionName string
+	newVersionName string
 	pageTemplate   = `
 <!DOCTYPE html>
 <html>
@@ -62,24 +66,21 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
-	if NewVersionName == "" {
+	if newVersionName == "" {
 		http.Error(w, `Unauthorized access`, http.StatusUnauthorized)
 		return
 	}
-	err := DownloadFile(NewVersionName)
+
+	err := DownloadAndVerifyFile(filepath.Join(UpdateDir, newVersionName))
 	if err != nil {
-		errString := fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err)
+		errString := fmt.Sprintf("Error while donwloading %s: %v", newVersionName, err)
 		log.Fatalf(errString)
 		http.Error(w, errString, http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("Exec downloaded.\n")
 	defer http.Redirect(w, r, "/", 302)
 	sh.signalCh <- syscall.SIGINT
-
-	// DownloadFile(NewVersionName)
-	// fmt.Printf("Exec downloaded.\n")
 
 }
 
@@ -112,9 +113,9 @@ func startServer(addr string, ln net.Listener) *http.Server {
 
 	p, err := RestartExec(addr, ln)
 	if err != nil {
-		fmt.Printf("Error while installing update: %s: %v.\n", NewVersionName, err)
+		fmt.Printf("Error while installing update: %s: %v.\n", newVersionName, err)
 	}
-	fmt.Printf("Update: %s installed sucessfully - pid:  %v.\n", NewVersionName, p.Pid)
+	fmt.Printf("Update: %s installed sucessfully - pid:  %v.\n", newVersionName, p.Pid)
 	// Create a context that will expire in 5 seconds and use this as a
 	// timeout to Shutdown.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -130,15 +131,15 @@ func startServer(addr string, ln net.Listener) *http.Server {
 // Download file from local storage dir 'Dist'
 // Should be passed an interface io.Reader for testing
 // No error returned on Donwload
-func DownloadFile(filename string) error {
+func DownloadAndVerifyFile(filePath string) error {
 
 	// Open the file that should be copied
 	// Read the contents
 	// Create and open the file that the contents should be copied into
 	// Write to the new file
 	// Close both files
-
-	from, err := os.Open(UpdateDir + filename)
+	fmt.Println(filePath)
+	from, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
@@ -148,6 +149,13 @@ func DownloadFile(filename string) error {
 	if err != nil {
 		return err
 	}
+
+	err = VerifyRSASignature(filePath, filePath+SignatureExtension)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Executable verified and Downloaded")
+
 	os.Remove(execName)
 	// A FileMode represents a file's mode and permission bits. 770 - Owner and Group have all, and Other can read and execute
 	to, err := os.OpenFile(execName, os.O_RDWR|os.O_CREATE, 0770)
@@ -171,9 +179,11 @@ func DownloadFile(filename string) error {
 // Make purposely no distinction between eventual
 // local storage read errors and no file found
 func checkNewVersion() string {
-	if filesName := listDir(); filesName != nil {
-		NewVersionName = filesName[0]
-		return strings.Split(filesName[0], ".")[1]
+	for _, f := range listDir() {
+		if fn := strings.Split(f, "."); len(fn) == 2 {
+			newVersionName = f
+			return fn[1]
+		}
 	}
 	return ""
 }
@@ -205,6 +215,7 @@ func main() {
 		os.Exit(1)
 	}
 	startServer(addr, ln)
+
 	// Wait for signals to either fork or quit.
 	fmt.Printf("Exiting.\n")
 }
