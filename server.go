@@ -62,7 +62,17 @@ func (sh *specifiHandler) handlerCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh *specifiHandler) handlerInstall(w http.ResponseWriter, r *http.Request) {
-	DownloadFile(NewVersionName)
+	if NewVersionName == "" {
+		http.Error(w, `Unauthorized access`, http.StatusUnauthorized)
+		return
+	}
+	err := DownloadFile(NewVersionName)
+	if err != nil {
+		errString := fmt.Sprintf("Error while donwloading %s: %v", NewVersionName, err)
+		log.Fatalf(errString)
+		http.Error(w, errString, http.StatusInternalServerError)
+	}
+
 	fmt.Printf("Exec downloaded.\n")
 	defer http.Redirect(w, r, "/", 302)
 	sh.signalCh <- syscall.SIGINT
@@ -119,7 +129,7 @@ func startServer(addr string, ln net.Listener) *http.Server {
 // Download file from local storage dir 'Dist'
 // Should be passed an interface io.Reader for testing
 // No error returned on Donwload
-func DownloadFile(filename string) {
+func DownloadFile(filename string) error {
 
 	// Open the file that should be copied
 	// Read the contents
@@ -129,20 +139,22 @@ func DownloadFile(filename string) {
 
 	from, err := os.Open(UpdateDir + filename)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer from.Close()
 	// A FileMode represents a file's mode and permission bits. 770 - Owner and Group have all, and Other can read and execute
 	to, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE, 0770)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer to.Close()
 
 	_, err = io.Copy(to, from)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
 
 // TODO: pass as an argument HARDCODED DIR '/DIST' PATH
