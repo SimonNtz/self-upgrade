@@ -24,13 +24,14 @@ http://localhost:9000
 
 #### Implementation details
 
-The example update executable file is stored on the `/dist` directory. We assume that their version extension is specified by `.versionX` and an aded extension `.signature` for their associated RSA signature.
+A example of updated executable file is stored on the `/dist` directory. We assume that the version extension is specified by `.verX` and an aded extension `.RSAsignature` for their associated RSA signature.
 
 #### Limitations/TODO
 
-- Command Line arguement
+- Command Line Argument
 - Generic file naming
 - Not running on Windows
+
 
 
 

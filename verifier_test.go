@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"path/filepath"
 	"testing"
 )
 
 func TestSignAndVerifiy(t *testing.T) {
-	targetFile := "dist/self-upgrade.ver24"
-	signatureFile := "dist/self-upgrade.ver24.RSAsignature"
+	targetFile := "dist/self-upgrade.ver2"
+	signatureFile := "dist/self-upgrade.ver2.RSAsignature"
 
 	SignErr := SignRSA(targetFile, signatureFile)
 	if SignErr != nil {
@@ -20,10 +18,10 @@ func TestSignAndVerifiy(t *testing.T) {
 	}
 }
 
-func TestDownloadFile(t *testing.T) {
-	fmt.Println(checkNewVersion())
-	DownloadErr := downloadAndVerifyFile(filepath.Join("dist", "self-upgrade.ver24"))
-	if DownloadErr != nil {
-		t.Errorf("Download failed failed: %s", DownloadErr)
-	}
-}
+// func TestDownloadFile(t *testing.T) {
+// 	fmt.Println(checkNewVersion())
+// 	DownloadErr := downloadAndVerifyFile(filepath.Join("dist", "self-upgrade.ver24"))
+// 	if DownloadErr != nil {
+// 		t.Errorf("Download failed failed: %s", DownloadErr)
+// 	}
+// }
